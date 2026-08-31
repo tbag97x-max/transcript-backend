@@ -40,8 +40,24 @@ app.get("/api/captions", async (req, res) => {
       return res.status(404).json({ error: "No captions found for this video" });
     }
 
+    if (req.query.list === "1") {
+      return res.json({
+        videoId,
+        tracks: tracks.map((t, i) => ({
+          index: i,
+          languageCode: t.language_code,
+          kind: t.kind ?? "manual",
+          requiresPoToken: t.base_url.includes("exp=xpe"),
+        })),
+      });
+    }
+
     // Prefer requested language, fall back to the first available track
-    const track = tracks.find((t) => t.language_code === lang) ?? tracks[0];
+    const requestedIndex = req.query.index !== undefined ? parseInt(req.query.index, 10) : null;
+    const track =
+      requestedIndex !== null && tracks[requestedIndex]
+        ? tracks[requestedIndex]
+        : tracks.find((t) => t.language_code === lang) ?? tracks[0];
 
     const xmlRes = await fetch(track.base_url);
     if (!xmlRes.ok) {
@@ -77,6 +93,7 @@ app.get("/api/captions", async (req, res) => {
       videoId,
       title: info.basic_info?.title ?? null,
       language: track.language_code,
+      kind: track.kind ?? "manual",
       availableLanguages: tracks.map((t) => t.language_code),
       segments,
       fullText: segments.map((s) => s.text).join(" "),
