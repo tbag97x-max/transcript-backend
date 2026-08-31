@@ -72,6 +72,7 @@ app.get("/api/captions", async (req, res) => {
       availableLanguages: tracks.map((t) => t.language_code),
       segments,
       fullText: segments.map((s) => s.text).join(" "),
+      _debugRawSample: segments.length === 0 ? xml.slice(0, 800) : undefined, // TEMP — remove once parsing is confirmed working
     });
   } catch (err) {
     console.error("Caption fetch failed:", err.message);
