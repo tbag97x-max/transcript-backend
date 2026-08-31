@@ -29,26 +29,47 @@ app.get("/api/captions", async (req, res) => {
   const videoId = extractVideoId(input);
   if (!videoId) return res.status(400).json({ error: "Could not parse a video ID" });
 
+  const lang = req.query.lang || "en";
+
   try {
     const yt = await getClient();
     const info = await yt.getInfo(videoId);
-    const transcriptData = await info.getTranscript();
 
-    const segments =
-      transcriptData?.transcript?.content?.body?.initial_segments?.map((seg) => ({
-        text: seg.snippet?.text ?? "",
-        startMs: seg.start_ms,
-        endMs: seg.end_ms,
-      })) ?? [];
-
-    if (segments.length === 0) {
-      return res.status(404).json({ error: "No transcript available for this video" });
+    const tracks = info.captions?.caption_tracks ?? [];
+    if (tracks.length === 0) {
+      return res.status(404).json({ error: "No captions found for this video" });
     }
+
+    // Prefer requested language, fall back to the first available track
+    const track = tracks.find((t) => t.language_code === lang) ?? tracks[0];
+
+    const xmlRes = await fetch(track.base_url);
+    if (!xmlRes.ok) {
+      return res.status(502).json({ error: `Caption track fetch failed: ${xmlRes.status}` });
+    }
+    const xml = await xmlRes.text();
+
+    // Parse the timedtext XML: <text start="1.2" dur="3.4">Hello there</text>
+    const segments = [...xml.matchAll(/<text start="([\d.]+)" dur="([\d.]+)"[^>]*>(.*?)<\/text>/gs)].map(
+      (m) => ({
+        startMs: Math.round(parseFloat(m[1]) * 1000),
+        durMs: Math.round(parseFloat(m[2]) * 1000),
+        text: m[3]
+          .replace(/&amp;/g, "&")
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .trim(),
+      })
+    );
 
     res.json({
       success: true,
       videoId,
       title: info.basic_info?.title ?? null,
+      language: track.language_code,
+      availableLanguages: tracks.map((t) => t.language_code),
       segments,
       fullText: segments.map((s) => s.text).join(" "),
     });
