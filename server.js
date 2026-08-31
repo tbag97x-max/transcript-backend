@@ -119,3 +119,4 @@ app.get("/api/captions", async (req, res) => {
 app.get("/", (req, res) => res.send("Captions API is running."));
 
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
+
