@@ -1,12 +1,23 @@
 const express = require("express");
 const { Innertube } = require("youtubei.js");
+const { generate: generatePoToken } = require("youtube-po-token-generator");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 let ytClient = null;
+let potExpiresAt = 0;
+const POT_TTL_MS = 1000 * 60 * 60 * 5; // regenerate every 5h, tokens don't last forever
+
 async function getClient() {
-  if (!ytClient) ytClient = await Innertube.create();
+  const needsFreshToken = !ytClient || Date.now() > potExpiresAt;
+  if (needsFreshToken) {
+    console.log("Generating fresh PO token...");
+    const { visitorData, poToken } = await generatePoToken();
+    ytClient = await Innertube.create({ po_token: poToken, visitor_data: visitorData });
+    potExpiresAt = Date.now() + POT_TTL_MS;
+    console.log("PO token acquired, session ready.");
+  }
   return ytClient;
 }
 
