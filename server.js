@@ -43,13 +43,14 @@ app.get("/api/captions", async (req, res) => {
     // Prefer requested language, fall back to the first available track
     const track = tracks.find((t) => t.language_code === lang) ?? tracks[0];
 
-    const xmlRes = await yt.session.http.fetch(track.base_url);
+    const xmlRes = await fetch(track.base_url);
     if (!xmlRes.ok) {
       return res.status(502).json({ error: `Caption track fetch failed: ${xmlRes.status}` });
     }
     const xml = await xmlRes.text();
     const debugInfo = {
       baseUrl: track.base_url,
+      requiresPoToken: track.base_url.includes("exp=xpe"),
       status: xmlRes.status,
       contentLength: xmlRes.headers.get("content-length"),
       contentType: xmlRes.headers.get("content-type"),
