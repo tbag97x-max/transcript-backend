@@ -43,11 +43,18 @@ app.get("/api/captions", async (req, res) => {
     // Prefer requested language, fall back to the first available track
     const track = tracks.find((t) => t.language_code === lang) ?? tracks[0];
 
-    const xmlRes = await fetch(track.base_url);
+    const xmlRes = await yt.session.http.fetch(track.base_url);
     if (!xmlRes.ok) {
       return res.status(502).json({ error: `Caption track fetch failed: ${xmlRes.status}` });
     }
     const xml = await xmlRes.text();
+    const debugInfo = {
+      baseUrl: track.base_url,
+      status: xmlRes.status,
+      contentLength: xmlRes.headers.get("content-length"),
+      contentType: xmlRes.headers.get("content-type"),
+      bodyLength: xml.length,
+    };
 
     // Parse the timedtext XML: <text start="1.2" dur="3.4">Hello there</text>
     const segments = [...xml.matchAll(/<text start="([\d.]+)" dur="([\d.]+)"[^>]*>(.*?)<\/text>/gs)].map(
@@ -72,7 +79,7 @@ app.get("/api/captions", async (req, res) => {
       availableLanguages: tracks.map((t) => t.language_code),
       segments,
       fullText: segments.map((s) => s.text).join(" "),
-      _debugRawSample: segments.length === 0 ? xml.slice(0, 800) : undefined, // TEMP — remove once parsing is confirmed working
+      _debug: segments.length === 0 ? debugInfo : undefined, // TEMP
     });
   } catch (err) {
     console.error("Caption fetch failed:", err.message);
